@@ -1,0 +1,1422 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>السجل</title>
+<!-- Android build: uses system Arabic fonts offline instead of Google Fonts (no internet dependency). -->
+<!-- Android build: SQLite + Excel are handled natively via window.AndroidDB / window.AndroidFile. -->
+<style>
+  :root{
+    --ink:#1C2B39;
+    --ink-light:#2E4053;
+    --paper:#FAF7F1;
+    --paper-dim:#F1ECE1;
+    --card:#FFFFFF;
+    --gold:#B08D57;
+    --gold-dim:#E4D4B8;
+    --green:#3D6B4F;
+    --green-dim:#E1EBE4;
+    --clay:#A85D4C;
+    --clay-dim:#F2E0DB;
+    --text:#2A2A28;
+    --text-dim:#6B675F;
+    --border:#E3DCC9;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:'Tajawal','Noto Sans Arabic','Droid Arabic Naskh',sans-serif;
+    background:var(--paper);
+    color:var(--text);
+    display:flex;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+    direction:rtl;
+  }
+  ::selection{background:var(--gold-dim);}
+
+  /* ---------- Sidebar ---------- */
+  .sidebar{
+    width:230px;
+    background:var(--ink);
+    color:#EDEAE0;
+    display:flex;
+    flex-direction:column;
+    padding:28px 0;
+    flex-shrink:0;
+  }
+  .brand{
+    font-family:'Tajawal',sans-serif;
+    font-weight:800;
+    font-size:21px;
+    padding:0 24px 28px;
+    border-bottom:1px solid rgba(255,255,255,0.12);
+    margin-bottom:20px;
+    letter-spacing:0;
+  }
+  .brand small{
+    display:block;
+    font-family:'Cairo',sans-serif;
+    font-weight:400;
+    font-size:12px;
+    color:#A9B4BE;
+    margin-top:4px;
+  }
+  .nav-item{
+    display:flex;
+    align-items:center;
+    gap:11px;
+    padding:12px 24px;
+    cursor:pointer;
+    font-size:15px;
+    font-weight:600;
+    color:#C9D0D6;
+    border-right:3px solid transparent;
+    transition:background .15s, color .15s;
+  }
+  .nav-item:hover{ background:rgba(255,255,255,0.05); color:#fff; }
+  .nav-item.active{
+    background:rgba(255,255,255,0.07);
+    color:#fff;
+    border-right:3px solid var(--gold);
+  }
+  .nav-icon{ width:17px; text-align:center; font-size:15px; }
+  .sidebar-footer{
+    margin-top:auto;
+    padding:16px 24px 0;
+    border-top:1px solid rgba(255,255,255,0.1);
+  }
+  .sidebar-btn{
+    width:100%;
+    background:transparent;
+    border:1px solid rgba(255,255,255,0.2);
+    color:#C9D0D6;
+    padding:9px 10px;
+    border-radius:6px;
+    font-size:13px;
+    font-family:'Tajawal',sans-serif;
+    font-weight:500;
+    cursor:pointer;
+    margin-top:8px;
+    transition:all .15s;
+  }
+  .sidebar-btn:hover{ border-color:var(--gold); color:#fff; }
+
+  /* ---------- Main ---------- */
+  .main{ flex:1; padding:36px 44px; max-width:1100px; overflow-y:auto; }
+  .page{ display:none; animation:fadeIn .25s ease; }
+  .page.active{ display:block; }
+  @keyframes fadeIn{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;} }
+
+  h1{
+    font-family:'Tajawal',sans-serif;
+    font-size:27px;
+    font-weight:800;
+    color:var(--ink);
+    margin-bottom:4px;
+  }
+  .subtitle{ color:var(--text-dim); font-size:14.5px; margin-bottom:28px; }
+
+  /* ---------- Dashboard ---------- */
+  .total-card{
+    background:var(--ink);
+    color:#fff;
+    border-radius:14px;
+    padding:32px 36px;
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    margin-bottom:22px;
+    position:relative;
+    overflow:hidden;
+  }
+  .total-card::before{
+    content:"";
+    position:absolute;
+    left:-30px; top:-30px;
+    width:160px; height:160px;
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius:50%;
+  }
+  .total-card::after{
+    content:"";
+    position:absolute;
+    left:10px; top:10px;
+    width:100px; height:100px;
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius:50%;
+  }
+  .total-num{ font-family:'Tajawal',sans-serif; font-size:54px; font-weight:800; line-height:1; }
+  .total-label{ font-size:14px; color:#B8C2CB; margin-top:6px; font-weight:500; }
+  .total-stamp{ font-size:12.5px; color:#8FA0AC; text-align:left; }
+
+  .region-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:32px; }
+  .region-card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:22px 20px;
+    position:relative;
+  }
+  .region-card .r-name{
+    font-size:13px;
+    color:var(--text-dim);
+    font-weight:700;
+    margin-bottom:10px;
+  }
+  .region-card .r-num{ font-family:'Tajawal',sans-serif; font-size:34px; font-weight:800; color:var(--ink); }
+  .region-card .r-bar{ height:4px; border-radius:3px; background:var(--paper-dim); margin-top:14px; overflow:hidden; }
+  .region-card .r-bar-fill{ height:100%; border-radius:3px; background:var(--gold); transition:width .4s ease; }
+
+  .section-label{
+    font-size:13px;
+    color:var(--text-dim);
+    font-weight:700;
+    margin:28px 0 12px;
+  }
+  .recent-list{ background:var(--card); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+  .recent-row{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:13px 20px;
+    border-bottom:1px solid var(--border);
+    font-size:14.5px;
+  }
+  .recent-row:last-child{ border-bottom:none; }
+  .recent-row .rr-name{ font-weight:700; color:var(--ink); }
+  .recent-row .rr-meta{ color:var(--text-dim); font-size:12.5px; }
+  .tag{
+    font-size:11.5px; font-weight:700; padding:3px 10px; border-radius:20px;
+  }
+  .tag-south{ background:#E9E4F5; color:#5B4A8A; }
+  .tag-west{ background:var(--green-dim); color:var(--green); }
+  .tag-east{ background:var(--clay-dim); color:var(--clay); }
+  .empty-note{ padding:26px 20px; color:var(--text-dim); font-size:14px; text-align:center; }
+
+  /* ---------- Form ---------- */
+  .form-card{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:30px 34px; max-width:760px; }
+  .form-grid{ display:grid; grid-template-columns:1fr 1fr; gap:18px 20px; }
+  .field{ display:flex; flex-direction:column; gap:6px; }
+  .field.full{ grid-column:1 / -1; }
+  .field label{ font-size:13px; font-weight:700; color:var(--ink-light); }
+  .field label .opt{ font-weight:400; color:var(--text-dim); }
+  .field input, .field select, .field textarea{
+    font-family:'Tajawal',sans-serif;
+    font-size:15px;
+    padding:10px 12px;
+    border:1px solid var(--border);
+    border-radius:8px;
+    background:var(--paper);
+    color:var(--text);
+    outline:none;
+    transition:border-color .15s, background .15s;
+    text-align:right;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{
+    border-color:var(--gold); background:#fff;
+  }
+  .field textarea{ resize:vertical; min-height:64px; font-family:'Tajawal',sans-serif; }
+  .autocomplete-wrap{ position:relative; }
+  .autocomplete-list{
+    position:absolute; top:calc(100% + 4px); right:0; left:0;
+    background:#fff; border:1px solid var(--border); border-radius:8px;
+    max-height:180px; overflow-y:auto; z-index:20;
+    box-shadow:0 8px 20px rgba(28,43,57,0.12);
+    display:none;
+  }
+  .autocomplete-list.show{ display:block; }
+  .autocomplete-item{ padding:9px 12px; font-size:14.5px; cursor:pointer; }
+  .autocomplete-item:hover, .autocomplete-item.hi{ background:var(--paper-dim); }
+  .autocomplete-empty{ padding:9px 12px; font-size:13px; color:var(--text-dim); font-style:normal; }
+
+  .form-actions{ display:flex; gap:12px; margin-top:26px; align-items:center; }
+  .btn{
+    font-family:'Tajawal',sans-serif;
+    font-weight:700; font-size:14.5px;
+    padding:11px 22px; border-radius:8px;
+    border:none; cursor:pointer;
+    transition:transform .1s, box-shadow .15s, background .15s;
+  }
+  .btn:active{ transform:scale(0.98); }
+  .btn-primary{ background:var(--ink); color:#fff; }
+  .btn-primary:hover{ background:var(--ink-light); }
+  .btn-ghost{ background:transparent; color:var(--text-dim); border:1px solid var(--border); }
+  .btn-ghost:hover{ border-color:var(--text-dim); color:var(--text); }
+  .btn-danger{ background:var(--clay-dim); color:var(--clay); }
+  .btn-danger:hover{ background:#EAC7BE; }
+  .btn-small{ padding:7px 14px; font-size:13px; border-radius:6px; }
+
+  .save-flash{
+    display:none;
+    align-items:center; gap:10px;
+    background:var(--green-dim); color:var(--green);
+    padding:10px 16px; border-radius:8px; font-size:14px; font-weight:700;
+    margin-top:16px;
+  }
+  .save-flash.show{ display:flex; animation:fadeIn .2s ease; }
+
+  /* ---------- Directory ---------- */
+  .search-bar{ display:flex; gap:10px; margin-bottom:20px; }
+  .search-bar input{
+    flex:1; font-family:'Tajawal',sans-serif; font-size:15px;
+    padding:12px 16px; border:1px solid var(--border); border-radius:9px;
+    background:var(--card); outline:none; text-align:right;
+  }
+  .search-bar input:focus{ border-color:var(--gold); }
+  .search-bar select{
+    font-family:'Tajawal',sans-serif; font-size:14.5px;
+    padding:12px 14px; border:1px solid var(--border); border-radius:9px;
+    background:var(--card); outline:none; color:var(--text);
+  }
+  table{ width:100%; border-collapse:collapse; background:var(--card); border-radius:12px; overflow:hidden; border:1px solid var(--border); }
+  thead th{
+    text-align:right; font-size:12px; font-weight:700;
+    color:var(--text-dim); padding:12px 16px; background:var(--paper-dim);
+    border-bottom:1px solid var(--border);
+  }
+  tbody td{ padding:13px 16px; font-size:14px; border-bottom:1px solid var(--border); color:var(--text); }
+  tbody tr:last-child td{ border-bottom:none; }
+  tbody tr:hover{ background:var(--paper-dim); }
+  .id-chip{ font-family:'Tajawal',sans-serif; font-weight:700; color:var(--gold); }
+  .row-actions{ display:flex; gap:6px; }
+  .icon-btn{
+    background:none; border:none; cursor:pointer; font-size:14px; color:var(--text-dim);
+    padding:5px 9px; border-radius:6px;
+    display:inline-flex; align-items:center; gap:4px;
+    font-family:'Tajawal',sans-serif; font-weight:600; font-size:12.5px;
+  }
+  .icon-btn:hover{ background:var(--paper-dim); color:var(--ink); }
+  .icon-btn.edit:hover{ color:var(--gold); background:var(--gold-dim); }
+  .icon-btn.danger:hover{ color:var(--clay); background:var(--clay-dim); }
+
+  /* ---------- Modern pagination ---------- */
+  .pagination-bar{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:12px;
+    margin:18px auto 4px;
+    padding:14px 16px;
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:12px;
+    box-sizing:border-box;
+  }
+  .pagination-info{
+    color:var(--text-dim);
+    font-size:12.5px;
+    font-weight:600;
+    text-align:center;
+    line-height:1.5;
+  }
+  .pagination-controls{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-wrap:wrap;
+    gap:6px;
+    direction:rtl;
+  }
+  .pagination-controls button{
+    appearance:none;
+    min-width:38px;
+    height:36px;
+    padding:0 11px;
+    border:1px solid var(--border);
+    border-radius:9px;
+    background:var(--paper);
+    color:var(--text);
+    font-family:'Tajawal',sans-serif;
+    font-size:12.5px;
+    font-weight:700;
+    cursor:pointer;
+    transition:all .16s ease;
+    box-shadow:0 1px 2px rgba(0,0,0,.03);
+  }
+  .pagination-controls button:hover:not(:disabled){
+    border-color:var(--gold);
+    background:var(--gold-dim);
+    color:var(--ink);
+    transform:translateY(-1px);
+  }
+  .pagination-controls button.active{
+    background:var(--ink);
+    border-color:var(--ink);
+    color:#fff;
+    box-shadow:0 3px 8px rgba(0,0,0,.12);
+  }
+  .pagination-controls button:disabled{
+    opacity:.38;
+    cursor:not-allowed;
+    box-shadow:none;
+  }
+  .pagination-controls > span{
+    min-width:22px;
+    text-align:center;
+    color:var(--text-dim);
+    font-weight:700;
+  }
+  .pagination-size{
+    height:36px;
+    min-width:104px;
+    padding:0 30px 0 10px;
+    border:1px solid var(--border);
+    border-radius:9px;
+    background:var(--paper);
+    color:var(--text);
+    font-family:'Tajawal',sans-serif;
+    font-size:12.5px;
+    font-weight:700;
+    cursor:pointer;
+    outline:none;
+  }
+  .pagination-size:focus{ border-color:var(--gold); }
+  @media (max-width:600px){
+    .pagination-bar{ margin-top:14px; padding:12px 10px; }
+    .pagination-controls{ gap:5px; }
+    .pagination-controls button{ min-width:34px; height:34px; padding:0 8px; }
+    .pagination-size{ height:34px; }
+  }
+
+  /* ---------- Cities page ---------- */
+  .city-add-row{ display:flex; gap:10px; margin-bottom:20px; max-width:520px; }
+  .city-add-row input{
+    flex:1; font-family:'Tajawal',sans-serif; font-size:14.5px;
+    padding:10px 14px; border:1px solid var(--border); border-radius:8px; background:var(--card);
+    text-align:right;
+  }
+  .city-add-row select{
+    font-family:'Tajawal',sans-serif; font-size:14.5px;
+    padding:10px 14px; border:1px solid var(--border); border-radius:8px; background:var(--card);
+  }
+  .city-list{ display:flex; flex-wrap:wrap; gap:10px; max-width:760px; }
+  .city-pill{
+    display:flex; align-items:center; gap:10px;
+    background:var(--card); border:1px solid var(--border); border-radius:20px;
+    padding:8px 16px 8px 8px; font-size:14px;
+  }
+  .city-pill .cp-region{ font-size:11.5px; color:var(--text-dim); }
+  .city-pill button{ background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:13px; padding:4px 8px; border-radius:50%; }
+  .city-pill button:hover{ color:var(--clay); background:var(--clay-dim); }
+  .city-pill.auto{ border-style:dashed; }
+  .city-pill .cp-auto-tag{ font-size:10.5px; color:var(--gold); font-weight:700; }
+
+  /* ---------- Modal ---------- */
+  .modal-backdrop{
+    display:none; position:fixed; inset:0; background:rgba(28,43,57,0.45);
+    align-items:center; justify-content:center; z-index:100;
+  }
+  .modal-backdrop.show{ display:flex; }
+  .modal{
+    background:#fff; border-radius:14px; padding:28px 30px; width:440px; max-width:90vw;
+    box-shadow:0 20px 50px rgba(0,0,0,0.25);
+    max-height:88vh; overflow-y:auto;
+  }
+  .modal h3{ font-family:'Tajawal',sans-serif; font-size:20px; font-weight:800; color:var(--ink); margin-bottom:10px; }
+  .modal p{ font-size:14.5px; color:var(--text-dim); margin-bottom:22px; line-height:1.6; }
+  .modal-actions{ display:flex; gap:10px; justify-content:flex-start; margin-top:8px; }
+
+  /* ---------- Person detail modal ---------- */
+  .detail-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px 20px; margin-bottom:18px; }
+  .detail-item .di-label{ font-size:11.5px; color:var(--text-dim); font-weight:700; }
+  .detail-item .di-val{ font-size:15px; color:var(--text); margin-top:2px; }
+  .detail-item.full{ grid-column:1/-1; }
+
+  /* ---------- Device review ---------- */
+  .device-layout{ display:grid; grid-template-columns:250px minmax(0,1fr); gap:20px; align-items:start; }
+  .device-list-panel,.device-results-panel{ background:var(--card); border:1px solid var(--border); border-radius:12px; padding:18px; }
+  .device-list{ display:flex; flex-direction:column; gap:8px; max-height:520px; overflow:auto; }
+  .device-card{ width:100%; text-align:right; border:1px solid var(--border); background:var(--paper); border-radius:9px; padding:12px 14px; cursor:pointer; font-family:'Tajawal',sans-serif; color:var(--ink); display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .device-card:hover{ border-color:var(--gold); }
+  .device-card.active{ background:var(--ink); color:#fff; border-color:var(--ink); }
+  .device-card .device-code{ font-weight:800; direction:ltr; text-align:left; }
+  .device-card .device-count{ font-size:12px; color:var(--text-dim); }
+  .device-card.active .device-count{ color:#C9D0D6; }
+  .device-selected-header{ font-weight:800; font-size:18px; color:var(--ink); margin-bottom:16px; min-height:26px; }
+  .search-bar-main input,.search-bar-device input{ flex:1; min-width:180px; }
+  .search-bar-main select,.search-bar-device select{ min-width:150px; }
+  .empty-device{ color:var(--text-dim); text-align:center; padding:28px 10px; font-size:14px; }
+
+  .device-layout{ grid-template-columns:1fr; }
+  .device-list{ max-height:260px; }
+  .search-bar-main,.search-bar-device{ flex-wrap:wrap; }
+  .search-bar-main input,.search-bar-main select,.search-bar-device input,.search-bar-device select{ width:100%; min-width:0; }
+  @media (max-width:800px){
+    .sidebar{ width:64px; }
+    .brand span, .brand small, .nav-item span.label{ display:none; }
+    .brand{ text-align:center; padding:20px 0; }
+    .nav-item{ justify-content:center; padding:14px 0; }
+    .sidebar-footer{ padding:12px 8px 0; }
+    .sidebar-footer #deviceBadge{ display:none; }
+    .sidebar-btn{ font-size:0; padding:10px 0; position:relative; }
+    .sidebar-btn::before{ font-size:16px; }
+    #exportBtn::before{ content:"\2913"; }
+    #importBtn::before{ content:"\2912"; }
+    #whatsappBtn::before{ content:"\260E"; }
+    .main{ padding:24px 18px; }
+    .region-grid{ grid-template-columns:1fr; }
+    .form-grid{ grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="brand">السجل<span></span><small>تسجيل الحضور</small></div>
+  <div class="nav-item active" data-page="dashboard"><span class="nav-icon">&#9673;</span><span class="label">لوحة العدّ</span></div>
+  <div class="nav-item" data-page="add"><span class="nav-icon">&#10010;</span><span class="label">إضافة شخص</span></div>
+  <div class="nav-item" data-page="directory"><span class="nav-icon">&#9776;</span><span class="label">السجل والبحث</span></div>
+  <div class="nav-item" data-page="cities"><span class="nav-icon">&#9679;</span><span class="label">المدن</span></div>
+  <div class="nav-item" data-page="devices"><span class="nav-icon">&#9783;</span><span class="label">الأجهزة</span></div>
+  <div class="sidebar-footer">
+    <div id="deviceBadge" style="font-size:12px; color:#8FA0AC; margin-bottom:10px;"></div>
+    <button class="sidebar-btn" id="exportBtn" title="تصدير إلى إكسل">تصدير إلى إكسل</button>
+    <button class="sidebar-btn" id="importBtn" title="استيراد من إكسل">استيراد من إكسل</button>
+    <button class="sidebar-btn" id="whatsappBtn" title="تصدير وإرسال عبر واتساب" style="border-color:#3D6B4F; color:#8fd6a8;">إرسال عبر واتساب</button>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- DASHBOARD -->
+  <div class="page active" id="page-dashboard">
+    <h1>لوحة العدّ</h1>
+    <div class="subtitle">عدد جميع المسجّلين في الفعالية، محدث لحظياً.</div>
+
+    <div class="total-card">
+      <div>
+        <div class="total-num" id="totalCount">0</div>
+        <div class="total-label">إجمالي المسجّلين</div>
+      </div>
+      <div class="total-stamp" id="stampDate"></div>
+    </div>
+
+    <div class="region-grid">
+      <div class="region-card">
+        <div class="r-name">الجنوب</div>
+        <div class="r-num" id="countSouth">0</div>
+        <div class="r-bar"><div class="r-bar-fill" id="barSouth" style="width:0%"></div></div>
+      </div>
+      <div class="region-card">
+        <div class="r-name">الغرب</div>
+        <div class="r-num" id="countWest">0</div>
+        <div class="r-bar"><div class="r-bar-fill" id="barWest" style="width:0%"></div></div>
+      </div>
+      <div class="region-card">
+        <div class="r-name">الشرق</div>
+        <div class="r-num" id="countEast">0</div>
+        <div class="r-bar"><div class="r-bar-fill" id="barEast" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <div class="section-label">آخر المسجّلين</div>
+    <div class="recent-list" id="recentList"></div>
+  </div>
+
+  <!-- ADD PERSON -->
+  <div class="page" id="page-add">
+    <h1 id="formTitle">إضافة شخص</h1>
+    <div class="subtitle" id="formSubtitle">أدخل بياناته ثم اضغط حفظ لتسجيله.</div>
+
+    <div class="form-card">
+      <div class="form-grid" id="personForm">
+        <div class="field">
+          <label>الاسم</label>
+          <input type="text" id="f_name" placeholder="الاسم الأول">
+        </div>
+        <div class="field">
+          <label>اللقب</label>
+          <input type="text" id="f_surname" placeholder="اللقب">
+        </div>
+        <div class="field">
+          <label>العمر</label>
+          <input type="number" id="f_age" min="0" max="120" placeholder="مثال: 34">
+        </div>
+        <div class="field">
+          <label>المنطقة</label>
+          <select id="f_region">
+            <option value="">اختر المنطقة</option>
+            <option value="South">الجنوب</option>
+            <option value="West">الغرب</option>
+            <option value="East">الشرق</option>
+          </select>
+        </div>
+        <div class="field autocomplete-wrap">
+          <label>مدينة الإقامة</label>
+          <input type="text" id="f_city" placeholder="ابدأ بكتابة اسم المدينة..." autocomplete="off">
+          <div class="autocomplete-list" id="cityList_res"></div>
+        </div>
+        <div class="field autocomplete-wrap">
+          <label>مدينة الأصل <span class="opt">(موطن القبيلة)</span></label>
+          <input type="text" id="f_origin_city" placeholder="ابدأ بكتابة اسم المدينة..." autocomplete="off">
+          <div class="autocomplete-list" id="cityList_origin"></div>
+        </div>
+        <div class="field">
+          <label>القبيلة</label>
+          <input type="text" id="f_tribe" placeholder="اسم القبيلة">
+        </div>
+        <div class="field">
+          <label>رقم الهوية <span class="opt">(جواز سفر / بطاقة شخصية)</span></label>
+          <input type="text" id="f_idnum" placeholder="رقم الهوية أو جواز السفر">
+        </div>
+        <div class="field">
+          <label>رقم الهاتف</label>
+          <input type="text" id="f_phone" placeholder="الهاتف الأساسي">
+        </div>
+        <div class="field">
+          <label>هاتف إضافي <span class="opt">(اختياري)</span></label>
+          <input type="text" id="f_phone2" placeholder="هاتف إضافي">
+        </div>
+        <div class="field full">
+          <label>الشهادة الدراسية <span class="opt">(اختياري)</span></label>
+          <input type="text" id="f_education" placeholder="مثال: بكالوريوس علوم">
+        </div>
+        <div class="field full">
+          <label>ملاحظات <span class="opt">(اختياري)</span></label>
+          <textarea id="f_notes" placeholder="أي ملاحظات إضافية..."></textarea>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn btn-primary" id="saveBtn" disabled>جارٍ تحميل السجل…</button>
+        <button class="btn btn-ghost" id="clearBtn">تفريغ النموذج</button>
+        <button class="btn btn-ghost" id="cancelEditBtn" style="display:none;">إلغاء التعديل</button>
+      </div>
+      <div class="save-flash" id="saveFlash"></div>
+    </div>
+  </div>
+
+  <!-- DIRECTORY -->
+  <div class="page" id="page-directory">
+    <h1>السجل والبحث</h1>
+    <div class="subtitle">ابحث عن أي مسجَّل بالاسم أو المدينة أو المنطقة أو القبيلة.</div>
+
+    <div class="search-bar search-bar-main">
+      <input type="text" id="searchInput" placeholder="ابحث بالاسم أو اللقب...">
+      <select id="searchField" title="مجال البحث">
+        <option value="name_surname" selected>الاسم واللقب</option>
+        <option value="name">الاسم</option>
+        <option value="surname">اللقب</option>
+        <option value="city">مدينة الإقامة</option>
+        <option value="origin_city">مدينة الأصل</option>
+        <option value="tribe">القبيلة</option>
+      </select>
+      <select id="regionFilter">
+        <option value="">كل المناطق</option>
+        <option value="South">الجنوب</option>
+        <option value="West">الغرب</option>
+        <option value="East">الشرق</option>
+      </select>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>الرقم</th>
+          <th>الاسم</th>
+          <th>العمر</th>
+          <th>المدينة</th>
+          <th>المنطقة</th>
+          <th>القبيلة</th>
+          <th>الهاتف</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="directoryBody"></tbody>
+    </table>
+    <div id="directoryPagination" class="pagination-bar"></div>
+  </div>
+
+  <!-- DEVICES -->
+  <div class="page" id="page-devices">
+    <h1>الأجهزة</h1>
+    <div class="subtitle">استعرض رموز الأجهزة/أعضاء الفريق المستخرجة تلقائياً من أرقام السجل، ثم راجع السجلات التي أضافها كل عضو.</div>
+
+    <div class="device-layout">
+      <div class="device-list-panel">
+        <div class="section-label" style="margin-top:0;">كل الأجهزة</div>
+        <div id="deviceList" class="device-list"></div>
+      </div>
+      <div class="device-results-panel">
+        <div id="deviceSelectedHeader" class="device-selected-header">اختر جهازاً لعرض سجلاته</div>
+        <div class="search-bar search-bar-device">
+          <input type="text" id="deviceSearchInput" placeholder="ابحث داخل سجلات هذا الجهاز..." disabled>
+          <select id="deviceSearchField" title="مجال البحث" disabled>
+            <option value="name_surname" selected>الاسم واللقب</option>
+            <option value="name">الاسم</option>
+            <option value="surname">اللقب</option>
+            <option value="city">مدينة الإقامة</option>
+            <option value="origin_city">مدينة الأصل</option>
+            <option value="tribe">القبيلة</option>
+          </select>
+          <select id="deviceRegionFilter" disabled>
+            <option value="">كل المناطق</option>
+            <option value="South">الجنوب</option>
+            <option value="West">الغرب</option>
+            <option value="East">الشرق</option>
+          </select>
+        </div>
+        <table>
+          <thead><tr><th>الرقم</th><th>الاسم</th><th>العمر</th><th>المدينة</th><th>المنطقة</th><th>القبيلة</th><th>الهاتف</th><th></th></tr></thead>
+          <tbody id="deviceDirectoryBody"></tbody>
+        </table>
+        <div id="devicePagination" class="pagination-bar"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CITIES -->
+  <div class="page" id="page-cities">
+    <h1>المدن</h1>
+    <div class="subtitle">إدارة قائمة المدن التي تظهر عند إضافة شخص جديد.</div>
+
+    <div class="city-add-row">
+      <input type="text" id="newCityName" placeholder="اسم المدينة">
+      <select id="newCityRegion">
+        <option value="">المنطقة</option>
+        <option value="South">الجنوب</option>
+        <option value="West">الغرب</option>
+        <option value="East">الشرق</option>
+      </select>
+      <button class="btn btn-primary btn-small" id="addCityBtn">إضافة مدينة</button>
+    </div>
+
+    <div class="section-label">كل المدن</div>
+    <div class="city-list" id="cityListAll"></div>
+  </div>
+
+</div>
+
+<!-- Confirm delete modal -->
+<div class="modal-backdrop" id="confirmModal">
+  <div class="modal">
+    <h3>حذف هذا السجل؟</h3>
+    <p id="confirmText">سيتم حذف هذا الشخص نهائياً من السجل. لا يمكن التراجع عن هذا الإجراء.</p>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="confirmOk">حذف</button>
+      <button class="btn btn-ghost" id="confirmCancel">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- Device code setup modal -->
+<div class="modal-backdrop" id="deviceModal">
+  <div class="modal">
+    <h3>سمِّ هذا الجهاز</h3>
+    <p>في أول تشغيل فقط، أعطِ هذا الجهاز رمزاً قصيراً، مثل <strong>A</strong> أو <strong>GATE1</strong>. سيُحفظ الرمز على هذا الجهاز/المتصفح ولن يُطلب منك مرة أخرى في التشغيلات التالية. كل شخص يُسجَّل من هذا الجهاز سيحصل على رقم يبدأ بهذا الرمز (مثل <strong>A-0001</strong>).</p>
+    <div class="field" style="margin-bottom:20px;">
+      <label>رمز الجهاز</label>
+      <input type="text" id="deviceCodeInput" placeholder="مثال: A, GATE1, RS" style="text-align:left; direction:ltr;">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="deviceCodeSave">حفظ ومتابعة</button>
+    </div>
+  </div>
+</div>
+
+<!-- Person detail modal -->
+<div class="modal-backdrop" id="detailModal">
+  <div class="modal" style="width:560px;">
+    <h3 id="detailName">—</h3>
+    <div class="detail-grid" id="detailGrid"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary btn-small" id="detailEdit">تعديل</button>
+      <button class="btn btn-danger btn-small" id="detailDelete">حذف</button>
+      <button class="btn btn-ghost btn-small" id="detailClose">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<script>
+window.addEventListener('error', e=>{
+  console.error('App error:', e.message);
+});
+
+const REGION_LABELS = { South:'الجنوب', West:'الغرب', East:'الشرق' };
+
+// ---------- Native SQLite bridge (Android) ----------
+// Data lives in a real on-device SQLite file via window.AndroidDB, exposed
+// from Kotlin. Schema creation/migration happens natively on the Kotlin side
+// (see RegistryDbHelper), so there is no initSchema()/migrateSchema() here —
+// the native layer guarantees the tables/columns exist before any query runs.
+// runQuery/runExec keep their original names and shapes so every call site
+// elsewhere in this file (searches, saves, exports...) needed zero changes.
+function runQuery(sql, params=[]){
+  const json = window.AndroidDB.query(sql, JSON.stringify(params));
+  return JSON.parse(json);
+}
+function runExec(sql, params=[]){
+  const resultJson = window.AndroidDB.exec(sql, JSON.stringify(params));
+  const result = JSON.parse(resultJson);
+  if(!result.ok) throw new Error(result.error || 'Database error');
+}
+// No separate "save" step is needed — native SQLite commits each statement
+// to disk immediately, so calls to this are now no-ops kept only so the
+// existing call sites (which await it after every write) don't need edits.
+async function saveDbToIDB(){ /* native SQLite auto-persists */ }
+
+// ---------- Device / gate code ----------
+// Stored natively via a tiny 'app_meta' table (created lazily here) so it
+// survives app reinstall-free updates and needs no localStorage/IndexedDB.
+const DEVICE_CODE_KEY = 'registry_device_code';
+let deviceCode = null;
+
+function ensureMetaTable(){
+  runExec(`CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT)`);
+}
+async function getStoredDeviceCode(){
+  ensureMetaTable();
+  const row = runQuery('SELECT value FROM app_meta WHERE key=?', [DEVICE_CODE_KEY])[0];
+  return row ? row.value : null;
+}
+async function persistDeviceCode(code){
+  const clean = String(code || '').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if(!clean) return;
+  ensureMetaTable();
+  runExec('INSERT INTO app_meta (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', [DEVICE_CODE_KEY, clean]);
+}
+
+async function recoverDeviceCodeFromDatabase(){
+  try{
+    const rows = runQuery(`SELECT registry_id FROM people WHERE registry_id IS NOT NULL AND registry_id != ''`);
+    const prefixes = [...new Set(rows.map(r=>String(r.registry_id).split('-')[0]).filter(Boolean))];
+    // If this database has records from exactly one gate/device, that prefix
+    // is enough to recover the device code if it was ever cleared.
+    if(prefixes.length === 1 && /^[A-Z0-9]+$/.test(prefixes[0])){
+      await persistDeviceCode(prefixes[0]);
+      return prefixes[0];
+    }
+  }catch(e){
+    console.warn('Could not recover device code from database:', e);
+  }
+  return null;
+}
+
+async function ensureDeviceCode(){
+  if(deviceCode) return deviceCode;
+
+  const stored = await getStoredDeviceCode();
+  if(stored){
+    deviceCode = stored;
+    return deviceCode;
+  }
+
+  const recovered = await recoverDeviceCodeFromDatabase();
+  if(recovered){
+    deviceCode = recovered;
+    return deviceCode;
+  }
+
+  // First run on this device/phone: ask once, store it natively, never ask again.
+  return new Promise(resolve=>{
+    const modal = document.getElementById('deviceModal');
+    modal.classList.add('show');
+    const input = document.getElementById('deviceCodeInput');
+    input.focus();
+
+    const finish = async ()=>{
+      const code = input.value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+      if(!code){ input.style.borderColor = 'var(--clay)'; return; }
+      await persistDeviceCode(code);
+      deviceCode = code;
+      modal.classList.remove('show');
+      input.value = code;
+      document.getElementById('deviceBadge').textContent = 'الجهاز: ' + code;
+      resolve(code);
+    };
+
+    const button = document.getElementById('deviceCodeSave');
+    button.onclick = finish;
+    input.onkeydown = e=>{ if(e.key==='Enter') finish(); };
+  });
+}
+
+function nextRegistryId(deviceCode){
+  // Never reuse an old number if the last/highest record was deleted.
+  const rows = runQuery(
+    `SELECT registry_id FROM people WHERE registry_id LIKE ?`,
+    [deviceCode + '-%']
+  );
+  let maxNum = 0;
+  for(const row of rows){
+    const parts = String(row.registry_id || '').split('-');
+    const n = parseInt(parts[parts.length-1], 10);
+    if(Number.isFinite(n) && n > maxNum) maxNum = n;
+  }
+  return `${deviceCode}-${String(maxNum + 1).padStart(4,'0')}`;
+}
+
+// ---------- Boot ----------
+async function boot(){
+  ensureMetaTable();
+  const code = await ensureDeviceCode();
+  document.getElementById('deviceBadge').textContent = 'الجهاز: ' + code;
+  const saveBtn = document.getElementById('saveBtn');
+  saveBtn.disabled = false;
+  saveBtn.textContent = 'حفظ الإدخال';
+  renderAll();
+}
+boot().catch(err=>{
+  console.error('Boot failed:', err);
+  alert('تعذّر تشغيل السجل.\n\nتفاصيل: ' + err.message);
+});
+
+// ---------- Navigation ----------
+document.querySelectorAll('.nav-item').forEach(item=>{
+  item.addEventListener('click', ()=>{
+    document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    item.classList.add('active');
+    document.getElementById('page-'+item.dataset.page).classList.add('active');
+    if(item.dataset.page === 'directory') renderDirectory();
+    if(item.dataset.page === 'cities') renderCities();
+    if(item.dataset.page === 'devices') renderDevices();
+    if(item.dataset.page === 'dashboard') renderDashboard();
+    if(item.dataset.page !== 'add' && editingId !== null) exitEditMode();
+  });
+});
+
+// ---------- Dashboard ----------
+function renderDashboard(){
+  const total = runQuery('SELECT COUNT(*) as c FROM people')[0].c;
+  document.getElementById('totalCount').textContent = total;
+  const stamp = document.getElementById('stampDate');
+  stamp.textContent = 'آخر تحديث ' + new Date().toLocaleString('ar-LY');
+
+  const regions = {South:0, West:0, East:0};
+  runQuery('SELECT region, COUNT(*) as c FROM people GROUP BY region').forEach(r=>{
+    if(regions.hasOwnProperty(r.region)) regions[r.region] = r.c;
+  });
+  document.getElementById('countSouth').textContent = regions.South;
+  document.getElementById('countWest').textContent = regions.West;
+  document.getElementById('countEast').textContent = regions.East;
+  const max = Math.max(1, regions.South, regions.West, regions.East);
+  document.getElementById('barSouth').style.width = (regions.South/max*100)+'%';
+  document.getElementById('barWest').style.width = (regions.West/max*100)+'%';
+  document.getElementById('barEast').style.width = (regions.East/max*100)+'%';
+
+  const recent = runQuery('SELECT * FROM people ORDER BY id DESC LIMIT 6');
+  const list = document.getElementById('recentList');
+  if(recent.length === 0){
+    list.innerHTML = '<div class="empty-note">لا يوجد أحد مسجَّل بعد. أضف أول شخص للبدء.</div>';
+  } else {
+    list.innerHTML = recent.map(p=>`
+      <div class="recent-row">
+        <div>
+          <div class="rr-name">${esc(p.name)} ${esc(p.surname||'')}</div>
+          <div class="rr-meta">${esc(p.city||'—')} &middot; ${esc(p.tribe||'—')}</div>
+        </div>
+        <span class="tag tag-${(p.region||'').toLowerCase()}">${REGION_LABELS[p.region] || '—'}</span>
+      </div>
+    `).join('');
+  }
+}
+
+// ---------- Cities: get + auto-save on manual entry ----------
+function getCities(){
+  return runQuery('SELECT * FROM cities ORDER BY name ASC');
+}
+async function ensureCitySaved(name, region){
+  name = (name||'').trim();
+  if(!name) return;
+  const existing = runQuery('SELECT * FROM cities WHERE LOWER(name) = LOWER(?)', [name])[0];
+  if(existing) return; // already known, nothing to do
+  // Not in the list yet — this was typed manually, so save it for next time.
+  try{
+    runExec('INSERT INTO cities (name, region, auto_added) VALUES (?,?,1)', [name, region || '']);
+  }catch(e){ /* race with a duplicate insert - ignore */ }
+}
+
+function wireAutocomplete(inputId, listId){
+  const input = document.getElementById(inputId);
+  const list = document.getElementById(listId);
+  input.addEventListener('input', ()=>{
+    const q = input.value.trim().toLowerCase();
+    if(!q){ list.classList.remove('show'); return; }
+    const matches = getCities().filter(c=>c.name.toLowerCase().startsWith(q));
+    if(matches.length === 0){
+      list.innerHTML = '<div class="autocomplete-empty">لا توجد مدينة مطابقة — يمكنك كتابة اسم جديد وسيُحفظ تلقائياً</div>';
+    } else {
+      list.innerHTML = matches.map(c=>`<div class="autocomplete-item" data-val="${esc(c.name)}">${esc(c.name)} <span style="color:var(--text-dim);font-size:12px;">(${REGION_LABELS[c.region] || c.region || ''})</span></div>`).join('');
+    }
+    list.classList.add('show');
+  });
+  list.addEventListener('click', e=>{
+    const item = e.target.closest('.autocomplete-item');
+    if(item && item.dataset.val){
+      input.value = item.dataset.val;
+      list.classList.remove('show');
+    }
+  });
+  document.addEventListener('click', e=>{
+    if(!input.contains(e.target) && !list.contains(e.target)) list.classList.remove('show');
+  });
+}
+wireAutocomplete('f_city', 'cityList_res');
+wireAutocomplete('f_origin_city', 'cityList_origin');
+
+// ---------- Save / Edit person ----------
+let editingId = null; // null = adding new person; otherwise the id being edited
+
+function enterEditMode(p){
+  editingId = p.id;
+  document.getElementById('f_name').value = p.name || '';
+  document.getElementById('f_surname').value = p.surname || '';
+  document.getElementById('f_age').value = p.age || '';
+  document.getElementById('f_region').value = p.region || '';
+  document.getElementById('f_city').value = p.city || '';
+  document.getElementById('f_origin_city').value = p.origin_city || '';
+  document.getElementById('f_tribe').value = p.tribe || '';
+  document.getElementById('f_idnum').value = p.id_number || '';
+  document.getElementById('f_education').value = p.education || '';
+  document.getElementById('f_notes').value = p.notes || '';
+  document.getElementById('f_phone').value = p.phone || '';
+  document.getElementById('f_phone2').value = p.phone2 || '';
+
+  document.getElementById('formTitle').textContent = 'تعديل بيانات — ' + p.name + ' ' + (p.surname||'');
+  document.getElementById('formSubtitle').textContent = 'عدّل الحقول ثم اضغط حفظ التعديلات.';
+  document.getElementById('saveBtn').textContent = 'حفظ التعديلات';
+  document.getElementById('cancelEditBtn').style.display = 'inline-block';
+
+  document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(pg=>pg.classList.remove('active'));
+  document.querySelector('.nav-item[data-page="add"]').classList.add('active');
+  document.getElementById('page-add').classList.add('active');
+  document.getElementById('f_name').focus();
+}
+
+function exitEditMode(){
+  editingId = null;
+  document.getElementById('formTitle').textContent = 'إضافة شخص';
+  document.getElementById('formSubtitle').textContent = 'أدخل بياناته ثم اضغط حفظ لتسجيله.';
+  document.getElementById('saveBtn').textContent = 'حفظ الإدخال';
+  document.getElementById('cancelEditBtn').style.display = 'none';
+  clearForm();
+}
+document.getElementById('cancelEditBtn').addEventListener('click', exitEditMode);
+
+document.getElementById('saveBtn').addEventListener('click', async ()=>{
+  if(!db){
+    alert('السجل ما زال قيد التحميل — الرجاء الانتظار قليلاً ثم المحاولة مرة أخرى.');
+    return;
+  }
+  const name = document.getElementById('f_name').value.trim();
+  const surname = document.getElementById('f_surname').value.trim();
+  if(!name){
+    document.getElementById('f_name').focus();
+    document.getElementById('f_name').style.borderColor = 'var(--clay)';
+    setTimeout(()=> document.getElementById('f_name').style.borderColor = '', 1200);
+    return;
+  }
+  try{
+    const vals = {
+      name,
+      surname,
+      age: document.getElementById('f_age').value || null,
+      city: document.getElementById('f_city').value.trim(),
+      origin_city: document.getElementById('f_origin_city').value.trim(),
+      region: document.getElementById('f_region').value,
+      tribe: document.getElementById('f_tribe').value.trim(),
+      id_number: document.getElementById('f_idnum').value.trim(),
+      education: document.getElementById('f_education').value.trim(),
+      notes: document.getElementById('f_notes').value.trim(),
+      phone: document.getElementById('f_phone').value.trim(),
+      phone2: document.getElementById('f_phone2').value.trim(),
+    };
+
+    // Any city typed that isn't already known gets saved for next time.
+    await ensureCitySaved(vals.city, vals.region);
+    await ensureCitySaved(vals.origin_city, vals.region);
+
+    const flash = document.getElementById('saveFlash');
+
+    if(editingId !== null){
+      runExec(
+        `UPDATE people SET name=?, surname=?, age=?, city=?, origin_city=?, region=?, tribe=?, id_number=?, education=?, notes=?, phone=?, phone2=? WHERE id=?`,
+        [vals.name, vals.surname, vals.age, vals.city, vals.origin_city, vals.region, vals.tribe, vals.id_number, vals.education, vals.notes, vals.phone, vals.phone2, editingId]
+      );
+      await saveDbToIDB();
+      flash.innerHTML = `&#10003; تم حفظ التعديلات على — ${esc(name)} ${esc(surname)}`;
+      flash.classList.add('show');
+      setTimeout(()=> flash.classList.remove('show'), 3200);
+      exitEditMode();
+    } else {
+      const deviceCode = await ensureDeviceCode();
+      const registryId = nextRegistryId(deviceCode);
+      runExec(
+        `INSERT INTO people (registry_id,name,surname,age,city,origin_city,region,tribe,id_number,education,notes,phone,phone2)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [registryId, vals.name, vals.surname, vals.age, vals.city, vals.origin_city, vals.region, vals.tribe, vals.id_number, vals.education, vals.notes, vals.phone, vals.phone2]
+      );
+      await saveDbToIDB();
+      flash.innerHTML = `&#10003; تم التسجيل برقم <strong>${esc(registryId)}</strong> — ${esc(name)} ${esc(surname)}`;
+      flash.classList.add('show');
+      setTimeout(()=> flash.classList.remove('show'), 3200);
+      clearForm();
+    }
+
+    renderDashboard();
+  }catch(err){
+    console.error('Save failed:', err);
+    alert('حدث خطأ أثناء الحفظ: ' + err.message);
+  }
+});
+document.getElementById('clearBtn').addEventListener('click', clearForm);
+function clearForm(){
+  ['f_name','f_surname','f_age','f_city','f_origin_city','f_tribe','f_idnum','f_education','f_notes','f_phone','f_phone2'].forEach(id=>{
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('f_region').value = '';
+  document.getElementById('f_name').focus();
+}
+
+// ---------- Exact search + pagination helpers ----------
+function normalizeSearchValue(value){
+  return String(value ?? '').trim().toLocaleLowerCase('ar');
+}
+function exactSearchMatch(person, field, query){
+  const q = normalizeSearchValue(query);
+  if(!q) return true;
+  const name = normalizeSearchValue(person.name);
+  const surname = normalizeSearchValue(person.surname);
+  if(field === 'name_surname') return name === q || surname === q;
+  return normalizeSearchValue(person[field]) === q;
+}
+function filterPeople(rows, query, field, region){
+  const q = String(query ?? '').trim();
+  return rows.filter(p => (!region || p.region === region) && (!q || exactSearchMatch(p, field, q)));
+}
+
+const paginationState = {
+  directory: {page:1, size:50},
+  device: {page:1, size:50}
+};
+function paginateRows(rows, state){
+  const total = rows.length;
+  const pages = Math.max(1, Math.ceil(total / state.size));
+  state.page = Math.min(Math.max(1, state.page), pages);
+  const start = (state.page - 1) * state.size;
+  return {items: rows.slice(start, start + state.size), total, pages, start};
+}
+function renderPagination(containerId, state, total, label){
+  const el = document.getElementById(containerId);
+  if(!el) return;
+  const pages = Math.max(1, Math.ceil(total / state.size));
+  state.page = Math.min(Math.max(1,state.page),pages);
+  const from = total ? ((state.page-1)*state.size)+1 : 0;
+  const to = total ? Math.min(state.page*state.size,total) : 0;
+  const maxButtons = 7;
+  let pageStart = Math.max(1, state.page - 3);
+  let pageEnd = Math.min(pages, pageStart + maxButtons - 1);
+  pageStart = Math.max(1, pageEnd - maxButtons + 1);
+  let buttons = `<button data-pg-action="prev" ${state.page===1?'disabled':''}>السابق</button>`;
+  if(pageStart > 1) buttons += `<button data-pg-page="1">1</button>${pageStart>2?'<span>…</span>':''}`;
+  for(let p=pageStart;p<=pageEnd;p++) buttons += `<button data-pg-page="${p}" class="${p===state.page?'active':''}">${p}</button>`;
+  if(pageEnd < pages) buttons += `${pageEnd<pages-1?'<span>…</span>':''}<button data-pg-page="${pages}">${pages}</button>`;
+  buttons += `<button data-pg-action="next" ${state.page===pages?'disabled':''}>التالي</button>`;
+  el.innerHTML = `<div class="pagination-info">عرض ${from}–${to} من ${total} ${label}</div><div class="pagination-controls">${buttons}<select class="pagination-size" aria-label="عدد السجلات في الصفحة"><option value="25" ${state.size===25?'selected':''}>25</option><option value="50" ${state.size===50?'selected':''}>50</option><option value="100" ${state.size===100?'selected':''}>100</option><option value="250" ${state.size===250?'selected':''}>250</option></select></div>`;
+  el.querySelectorAll('[data-pg-page]').forEach(b=>b.addEventListener('click',()=>{state.page=parseInt(b.dataset.pgPage); state.render();}));
+  el.querySelector('[data-pg-action="prev"]')?.addEventListener('click',()=>{if(state.page>1){state.page--;state.render();}});
+  el.querySelector('[data-pg-action="next"]')?.addEventListener('click',()=>{if(state.page<pages){state.page++;state.render();}});
+  el.querySelector('.pagination-size')?.addEventListener('change',e=>{state.size=parseInt(e.target.value);state.page=1;state.render();});
+}
+function renderPersonRows(rows, bodyId){
+  const body = document.getElementById(bodyId);
+  if(rows.length === 0){
+    body.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:30px; color:var(--text-dim);">لا توجد نتائج مطابقة.</td></tr>`;
+    return;
+  }
+  body.innerHTML = rows.map(p=>`
+    <tr data-id="${p.id}">
+      <td class="id-chip">${esc(p.registry_id || ('#'+String(p.id).padStart(4,'0')))}</td>
+      <td>${esc(p.name)} ${esc(p.surname||'')}</td>
+      <td>${p.age ?? '—'}</td>
+      <td>${esc(p.city||'—')}</td>
+      <td><span class="tag tag-${(p.region||'').toLowerCase()}">${REGION_LABELS[p.region] || '—'}</span></td>
+      <td>${esc(p.tribe||'—')}</td>
+      <td>${esc(p.phone||'—')}</td>
+      <td class="row-actions">
+        <button class="icon-btn edit" data-edit="${p.id}" title="تعديل">&#9998; تعديل</button>
+        <button class="icon-btn danger" data-del="${p.id}" title="حذف">&#10005; حذف</button>
+      </td>
+    </tr>`).join('');
+  body.querySelectorAll('tr[data-id]').forEach(row=>row.addEventListener('click',e=>{
+    if(e.target.closest('[data-del]') || e.target.closest('[data-edit]')) return;
+    openDetail(parseInt(row.dataset.id));
+  }));
+  body.querySelectorAll('[data-del]').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();confirmDelete(parseInt(btn.dataset.del));}));
+  body.querySelectorAll('[data-edit]').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();const p=runQuery('SELECT * FROM people WHERE id=?',[parseInt(btn.dataset.edit)])[0];if(p) enterEditMode(p);}));
+}
+
+// ---------- Directory ----------
+function renderDirectory(){
+  const rows = runQuery('SELECT * FROM people ORDER BY id DESC');
+  const filtered = filterPeople(rows, document.getElementById('searchInput').value, document.getElementById('searchField').value, document.getElementById('regionFilter').value);
+  const state = paginationState.directory;
+  state.render = ()=>renderDirectory();
+  const page = paginateRows(filtered,state);
+  renderPersonRows(page.items,'directoryBody');
+  renderPagination('directoryPagination',state,page.total,'سجل');
+}
+document.getElementById('searchInput').addEventListener('input',()=>{paginationState.directory.page=1;renderDirectory();});
+document.getElementById('searchField').addEventListener('change',()=>{paginationState.directory.page=1;renderDirectory();});
+document.getElementById('regionFilter').addEventListener('change',()=>{paginationState.directory.page=1;renderDirectory();});
+
+// ---------- Device review page ----------
+let selectedDeviceCode = null;
+function getDeviceCodeFromRegistryId(registryId){
+  const raw = String(registryId || '').trim();
+  const idx = raw.lastIndexOf('-');
+  return idx > 0 ? raw.slice(0,idx).trim().toUpperCase() : '';
+}
+function getDeviceSummary(){
+  const rows = runQuery(`SELECT registry_id FROM people WHERE registry_id IS NOT NULL AND TRIM(registry_id) != ''`);
+  const counts = new Map();
+  rows.forEach(r=>{const code=getDeviceCodeFromRegistryId(r.registry_id);if(code)counts.set(code,(counts.get(code)||0)+1);});
+  return [...counts.entries()].sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true}));
+}
+function renderDevices(){
+  const list=document.getElementById('deviceList');
+  const devices=getDeviceSummary();
+  if(!devices.length){selectedDeviceCode=null;list.innerHTML='<div class="empty-device">لا توجد أجهزة/أعضاء معرّفة بعد.<br>ستظهر هنا تلقائياً عند وجود أرقام مثل MA-0001 أو AH-0001.</div>';renderDeviceRecords();return;}
+  if(!selectedDeviceCode || !devices.some(d=>d[0]===selectedDeviceCode))selectedDeviceCode=devices[0][0];
+  list.innerHTML=devices.map(([code,count])=>`<button class="device-card ${code===selectedDeviceCode?'active':''}" data-device="${esc(code)}"><span class="device-code">${esc(code)}</span><span class="device-count">${count} سجل</span></button>`).join('');
+  list.querySelectorAll('[data-device]').forEach(btn=>btn.addEventListener('click',()=>{selectedDeviceCode=btn.dataset.device;document.getElementById('deviceSearchInput').value='';document.getElementById('deviceSearchField').value='name_surname';document.getElementById('deviceRegionFilter').value='';paginationState.device.page=1;renderDevices();}));
+  renderDeviceRecords();
+}
+function renderDeviceRecords(){
+  const header=document.getElementById('deviceSelectedHeader');
+  const input=document.getElementById('deviceSearchInput');
+  const field=document.getElementById('deviceSearchField');
+  const region=document.getElementById('deviceRegionFilter');
+  const state=paginationState.device;
+  state.render=()=>renderDeviceRecords();
+  if(!selectedDeviceCode){header.textContent='اختر جهازاً لعرض سجلاته';input.disabled=field.disabled=region.disabled=true;document.getElementById('deviceDirectoryBody').innerHTML='';renderPagination('devicePagination',state,0,'سجل');return;}
+  input.disabled=field.disabled=region.disabled=false;
+  const count=runQuery('SELECT COUNT(*) AS n FROM people WHERE registry_id LIKE ?',[selectedDeviceCode+'-%'])[0]?.n||0;
+  header.textContent=`سجلات الجهاز: ${selectedDeviceCode} — ${count} سجل`;
+  const rows=runQuery('SELECT * FROM people WHERE registry_id LIKE ? ORDER BY id DESC',[selectedDeviceCode+'-%']);
+  const filtered=filterPeople(rows,input.value,field.value,region.value);
+  const page=paginateRows(filtered,state);
+  renderPersonRows(page.items,'deviceDirectoryBody');
+  renderPagination('devicePagination',state,page.total,'سجل');
+}
+document.getElementById('deviceSearchInput').addEventListener('input',()=>{paginationState.device.page=1;renderDeviceRecords();});
+document.getElementById('deviceSearchField').addEventListener('change',()=>{paginationState.device.page=1;renderDeviceRecords();});
+document.getElementById('deviceRegionFilter').addEventListener('change',()=>{paginationState.device.page=1;renderDeviceRecords();});
+
+// ---------- Detail modal ----------
+let currentDetailId = null;
+function openDetail(id){
+  const p = runQuery('SELECT * FROM people WHERE id=?', [id])[0];
+  if(!p) return;
+  currentDetailId = id;
+  document.getElementById('detailName').textContent = `${p.name} ${p.surname||''}`;
+  const fields = [
+    ['الرقم', p.registry_id || ('#'+String(p.id).padStart(4,'0'))],
+    ['العمر', p.age ?? '—'],
+    ['المنطقة', REGION_LABELS[p.region] || '—'],
+    ['مدينة الإقامة', p.city || '—'],
+    ['مدينة الأصل', p.origin_city || '—'],
+    ['القبيلة', p.tribe || '—'],
+    ['رقم الهوية', p.id_number || '—'],
+    ['الشهادة الدراسية', p.education || '—'],
+    ['الهاتف', p.phone || '—'],
+    ['هاتف إضافي', p.phone2 || '—'],
+  ];
+  document.getElementById('detailGrid').innerHTML = fields.map(([l,v])=>`
+    <div class="detail-item"><div class="di-label">${l}</div><div class="di-val">${esc(String(v))}</div></div>
+  `).join('') + (p.notes ? `<div class="detail-item full"><div class="di-label">ملاحظات</div><div class="di-val">${esc(p.notes)}</div></div>` : '');
+  document.getElementById('detailModal').classList.add('show');
+}
+document.getElementById('detailClose').addEventListener('click', ()=> document.getElementById('detailModal').classList.remove('show'));
+document.getElementById('detailDelete').addEventListener('click', ()=>{
+  document.getElementById('detailModal').classList.remove('show');
+  confirmDelete(currentDetailId);
+});
+document.getElementById('detailEdit').addEventListener('click', ()=>{
+  document.getElementById('detailModal').classList.remove('show');
+  const p = runQuery('SELECT * FROM people WHERE id=?', [currentDetailId])[0];
+  if(p) enterEditMode(p);
+});
+
+// ---------- Delete confirm ----------
+let pendingDeleteId = null;
+function confirmDelete(id){
+  pendingDeleteId = id;
+  document.getElementById('confirmModal').classList.add('show');
+}
+document.getElementById('confirmCancel').addEventListener('click', ()=>{
+  document.getElementById('confirmModal').classList.remove('show');
+  pendingDeleteId = null;
+});
+document.getElementById('confirmOk').addEventListener('click', async ()=>{
+  if(pendingDeleteId != null){
+    runExec('DELETE FROM people WHERE id=?', [pendingDeleteId]);
+    await saveDbToIDB();
+    if(editingId === pendingDeleteId) exitEditMode();
+  }
+  document.getElementById('confirmModal').classList.remove('show');
+  pendingDeleteId = null;
+  renderDirectory();
+  renderDashboard();
+});
+
+// ---------- Cities page ----------
+function renderCities(){
+  const cities = getCities();
+  const wrap = document.getElementById('cityListAll');
+  if(cities.length === 0){
+    wrap.innerHTML = '<div class="empty-note" style="width:100%;">لا توجد مدن بعد. أضف واحدة أعلاه لتظهر في القائمة المنسدلة.</div>';
+    return;
+  }
+  wrap.innerHTML = cities.map(c=>`
+    <div class="city-pill ${c.auto_added ? 'auto' : ''}">
+      <span>${esc(c.name)}</span>
+      <span class="cp-region">${REGION_LABELS[c.region] || c.region || '—'}</span>
+      ${c.auto_added ? '<span class="cp-auto-tag">أُضيفت تلقائياً</span>' : ''}
+      <button data-cid="${c.id}" title="إزالة المدينة">&#10005;</button>
+    </div>
+  `).join('');
+  wrap.querySelectorAll('button[data-cid]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      runExec('DELETE FROM cities WHERE id=?', [btn.dataset.cid]);
+      await saveDbToIDB();
+      renderCities();
+    });
+  });
+}
+document.getElementById('addCityBtn').addEventListener('click', async ()=>{
+  const name = document.getElementById('newCityName').value.trim();
+  const region = document.getElementById('newCityRegion').value;
+  if(!name || !region) return;
+  try{
+    runExec('INSERT INTO cities (name, region, auto_added) VALUES (?,?,0)', [name, region]);
+    await saveDbToIDB();
+    document.getElementById('newCityName').value = '';
+    document.getElementById('newCityRegion').value = '';
+    renderCities();
+  }catch(e){
+    alert('هذه المدينة موجودة بالفعل.');
+  }
+});
+
+// ---------- Export / Import (Excel) ----------
+const XLSX_COLUMNS = [
+  ['registry_id','الرقم'], ['name','الاسم'], ['surname','اللقب'], ['age','العمر'],
+  ['city','مدينة الإقامة'], ['origin_city','مدينة الأصل'], ['region','المنطقة'],
+  ['tribe','القبيلة'], ['id_number','رقم الهوية'], ['education','الشهادة الدراسية'],
+  ['phone','الهاتف'], ['phone2','هاتف إضافي'], ['notes','ملاحظات'],
+  ['created_at','تاريخ التسجيل']
+];
+const REGION_EN_TO_AR = { South:'الجنوب', West:'الغرب', East:'الشرق' };
+const REGION_AR_TO_EN = { 'الجنوب':'South', 'الغرب':'West', 'الشرق':'East' };
+
+function buildExportData(){
+  const rows = runQuery('SELECT * FROM people ORDER BY id ASC');
+  const headers = XLSX_COLUMNS.map(c=>c[1]);
+  const data = rows.map(p => XLSX_COLUMNS.map(([key])=>{
+    if(key === 'region') return String(REGION_EN_TO_AR[p.region] || p.region || '');
+    return String(p[key] ?? '');
+  }));
+  return {headers, data};
+}
+
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+  const {headers, data} = buildExportData();
+  // Opens the Android system "save file" picker; the file is written once
+  // the user picks a location (handled natively in MainActivity).
+  window.AndroidFile.exportToPickedLocation(JSON.stringify(headers), JSON.stringify(data));
+});
+
+// One-tap "export + open WhatsApp" button, addressed to the fixed number.
+document.getElementById('whatsappBtn')?.addEventListener('click', ()=>{
+  const {headers, data} = buildExportData();
+  const WHATSAPP_NUMBER = '0934111001';
+  window.AndroidFile.exportAndShareToWhatsApp(JSON.stringify(headers), JSON.stringify(data), WHATSAPP_NUMBER);
+});
+
+function applyImportedRows(headers, rows){
+  // Map header variants back to our field keys, tolerant of the exact export headers
+  const headerMap = {};
+  XLSX_COLUMNS.forEach(([key,label])=>{ headerMap[label.toLowerCase()] = key; });
+  const headerIndexToKey = headers.map(h => headerMap[String(h).trim().toLowerCase()] || null);
+
+  let added = 0, skipped = 0;
+  const existingIdNums = new Set(
+    runQuery('SELECT id_number FROM people WHERE id_number IS NOT NULL AND id_number != ""')
+      .map(r=>String(r.id_number).trim().toLowerCase())
+  );
+  const existingRegistryIds = new Set(
+    runQuery('SELECT registry_id FROM people WHERE registry_id IS NOT NULL AND registry_id != ""')
+      .map(r=>String(r.registry_id).trim().toUpperCase())
+  );
+
+  for(const rowArr of rows){
+    const rec = {};
+    headerIndexToKey.forEach((key, i)=>{
+      if(key && key !== 'created_at') rec[key] = String(rowArr[i] ?? '').trim();
+    });
+    if(!rec.name) continue; // skip blank/garbage rows
+
+    // Normalize region: accept either Arabic label or English code
+    if(rec.region && REGION_AR_TO_EN[rec.region]) rec.region = REGION_AR_TO_EN[rec.region];
+
+    const idnum = (rec.id_number || '').toLowerCase();
+    const regId = (rec.registry_id || '').toUpperCase();
+
+    if(regId && existingRegistryIds.has(regId)){ skipped++; continue; }
+    if(idnum && existingIdNums.has(idnum)){ skipped++; continue; }
+
+    runExec(
+      `INSERT INTO people (registry_id,name,surname,age,city,origin_city,region,tribe,id_number,education,notes,phone,phone2)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [rec.registry_id||'', rec.name||'', rec.surname||'', rec.age||null, rec.city||'', rec.origin_city||'', rec.region||'', rec.tribe||'', rec.id_number||'', rec.education||'', rec.notes||'', rec.phone||'', rec.phone2||'']
+    );
+    ensureCitySaved(rec.city, rec.region);
+    ensureCitySaved(rec.origin_city, rec.region);
+
+    if(idnum) existingIdNums.add(idnum);
+    if(regId) existingRegistryIds.add(regId);
+    added++;
+  }
+
+  renderAll();
+  alert(`اكتمل الاستيراد — تمت إضافة ${added}، وتم تخطي ${skipped} كسجلات مكررة.`);
+}
+
+document.getElementById('importBtn').addEventListener('click', ()=>{
+  // Opens the Android system file picker; result comes back via
+  // window.onAndroidImportResult (called natively from MainActivity).
+  window.AndroidFile.pickImportFile();
+});
+
+window.onAndroidImportResult = function(resultJson){
+  try{
+    const {headers, rows} = JSON.parse(resultJson);
+    if(!headers || !headers.length){
+      alert('الملف فارغ أو غير مدعوم.');
+      return;
+    }
+    applyImportedRows(headers, rows);
+  }catch(err){
+    alert('تعذّرت قراءة هذا الملف. تأكد أنه ملف إكسل تم تصديره من هذا التطبيق.');
+  }
+};
+
+// ---------- Util ----------
+function esc(str){
+  const div = document.createElement('div');
+  div.textContent = str ?? '';
+  return div.innerHTML;
+}
+function renderAll(){
+  renderDashboard();
+  renderDirectory();
+  renderDevices();
+  renderCities();
+}
+</script>
+
+</body>
+</html>

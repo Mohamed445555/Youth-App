@@ -1,0 +1,10 @@
+.gradle/
+build/
+app/build/
+local.properties
+*.iml
+.idea/
+
+# Keep the signing key committed on purpose — every APK build must use the
+# same key, or reinstalling an updated APK over an older one will fail with
+# a signature mismatch. Do NOT add debug.keystore to this file.
