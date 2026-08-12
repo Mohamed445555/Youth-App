@@ -130,11 +130,11 @@ class SqliteBridge(private val context: Context) {
         }
     }
 
-    private fun jsonArrayToStringArray(paramsJson: String): Array<Any?> {
+ private fun jsonArrayToStringArray(paramsJson: String): Array<String?> {
         if (paramsJson.isBlank()) return arrayOf()
         val arr = JSONArray(paramsJson)
         return Array(arr.length()) { i ->
-            if (arr.isNull(i)) null else arr.get(i)
+            if (arr.isNull(i)) null else arr.get(i).toString()
         }
     }
 }
